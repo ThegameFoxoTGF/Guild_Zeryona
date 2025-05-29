@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-4Q6Gf2aSP4eDXB8Miphtr37CMZZQ5oXLH2yaXMJ2w8e2ZtHTl7GptT4jmndRuHDT" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js" integrity="sha384-j1CDi7MgGQ12Z7Qab0qlWQ/Qqz24Gc6BM0thvEMVjHnfYGF0rmFCozFSxQBxwHKO" crossorigin="anonymous"></script> -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+</head>
+<body >
+    <div class="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-lg shadow-lg font-bold text-base p-4 m-4 antialiased absolute">Zeryona</div>
+
+    <div class="mt-5 bg-gray-100 rounded-lg shadow-lg shadow-cyan-500/50 p-4 container mx-auto">
+        <div class="flex items-center form-row grid auto-cols-max grid-flow-col">
+            <div class="bg-white p-2 m-2 rounded-lg shadow-md">
+                <label class="p-2" for="guildSearchInput">ค้นหากิลด์:</label>
+                <input type="text" id="guildSearchInput" placeholder="กรองตามชื่อกิลด์" onkeyup="filterGuilds()">
+            </div>
+            <div class="bg-white p-2 m-2 rounded-lg shadow-md">
+                <label class="p-2" for="personSelect">Person:</label>
+                <select id="personSelect">
+                    <option value="__all__">แสดงทั้งหมด</option>
+                </select>
+            </div>
+            <div class="bg-white p-2 m-2 rounded-lg shadow-md ">
+                <label class="rounded-md" for="dateInput">Date:</label>
+                <input class="border-1 border-solid" for="dateInput" type="date" id="dateInput">
+            </div>
+        </div>
+        <div class="flex">
+            <button type="button" class="p-2 m-2 rounded-xl bg-blue-700 hover:bg-gray-500 text-white" onclick="fetchData()">ดึงข้อมูล</button>
+            <button type="button" class="p-2 m-2 rounded-xl bg-green-700 hover:bg-gray-500 text-white" onclick="saveChanges()">บันทึกข้อมูล</button>
+            <button type="button" class="p-2 m-2 rounded-xl bg-sky-700 hover:bg-gray-500 text-white" onclick="createnewDate()">➕ เพิ่มข้อมูลวันนี้</button>
+            
+        </div>
+
+        <div id="dataDisplay">
+
+        </div>
+    </div>
+
+    <script>
+        currentLoadedDateHTML = '';
+        let globalData = [];
+        let globalHeaders = [];
+
+        window.onload = function() {
+            setTodayDateDefault();
+        };
+
+        function setTodayDateDefault() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            document.getElementById('dateInput').value = `${year}-${month}-${day}`;
+        }
+
+        function fetchData(dateValue = null, selectedPerson = null) {
+
+            if (!dateValue) {
+                dateValue = document.getElementById('dateInput').value;
+            }
+
+            console.log('Effective dateValue:', dateValue);
+
+            document.getElementById('dataDisplay').innerHTML = `Loading Data...`;
+            currentLoadedDateHTML = dateValue;
+
+            google.script.run
+                .withSuccessHandler(function(repsonse) {
+                    console.log('Data received:', repsonse);
+                    globalData = repsonse.data;
+                    globalHeaders = repsonse.headers;
+
+                    const people = globalHeaders.slice(3); // Assuming the first three headers are not names
+                    const personSelect = document.getElementById('personSelect');
+                    personSelect.innerHTML = `<option value="__all__">แสดงทั้งหมด</option>` + 
+                        people.map(person => `<option value="${person}">${person}</option>`).join('');
+                    
+                    if (selectedPerson && people.includes(selectedPerson)) {
+                        personSelect.value = selectedPerson;
+                    } else {
+                        personSelect.value = '__all__';
+                    }
+
+                    if (personSelect.value === '__all__') {
+                        renderAllTable(globalData, globalHeaders);
+                    } else {
+                        renderFilteredTable(globalData, globalHeaders, personSelect.value);
+                    }
+
+                    personSelect.onchange = () => {
+                        const selectedPerson = personSelect.value;
+                        if (selectedPerson === '__all__') {
+                            renderAllTable(globalData, globalHeaders);
+                        } else {
+                            renderFilteredTable(globalData, globalHeaders, selectedPerson);
+                        }
+                    };
+                })
+                .withFailureHandler(handleError)
+                .getSheetData(dateValue);
+        }
+
+        function renderAllTable(data, headers) {
+            const outputDev = document.getElementById('dataDisplay');
+
+            let html = '<table class="min-w-full border border-gray-300 rounded-lg shadow-md">';
+            if (data && data.length > 0) {
+                html += `<thead class="bg-gray-800 text-white"> <tr>`;
+                headers.forEach(header => {
+                    html += `<th class="py-2 px-4 text-xl font-semibold text-center">${header}</th>`;
+                });
+                html += `</tr> </thead> <tbody class="bg-white divide-y divide-gray-200 text-xl">`;
+                data.forEach(entry => {
+                    html += `<tr class="text-center">`;
+                    entry.row.forEach(cell => {
+                        html += `<td class="py-2 px-4">${cell}</td>`;
+                    });
+                    html += `</tr>`;
+                });
+
+                html += `</tbody> </table>`;
+            }
+            outputDev.innerHTML = html;
+        }
+
+        function renderFilteredTable(data, headers, person) {
+            const outputDev = document.getElementById('dataDisplay');
+            const personIndex = headers.indexOf(person);
+            if (data.length === 0 || personIndex === -1) {
+                outputDev.innerHTML = `No data found for ${person}`;
+                return;
+            }
+
+            let html = `<table class="min-w-full border border-gray-300 rounded-lg overflow-hidden shadow-md">`;
+                html += `<thead class="bg-gray-800 text-white">
+                    <tr>
+                    <th class="py-2 px-4 text-xl font-semibold text-center">วันที่</th>
+                    <th class="py-2 px-4 text-xl font-semibold text-center">กิลด์</th>
+                    <th class="py-2 px-4 text-xl font-semibold text-center">${person}</th>
+                    <th class="py-2 px-4 text-xl font-semibold text-center">เพิ่ม/ลด</th>
+                    </tr>
+                </thead>`;
+                html += `<tbody class="bg-white divide-y divide-gray-200 text-xl">`;
+
+            data.forEach(({row, rowIndex}, displayIndex) => {
+                const data = row[0];
+                const guild = row[1];
+                const personData = row[personIndex] ?? 0;
+
+                html +=`<tr class="text-center">
+                    <td class="py-2 px-4">${data}</td>
+                    <td class="py-2 px-4">${guild}</td>
+                    <td id="val-${displayIndex}" class="py-2 px-4 text-center">${personData}</td>
+                    <td class="py-2 px-4 text-center">
+                        <button class="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-2 w-8 h-8 rounded-lg" onclick="adjustValue(${displayIndex}, 1)">+</button>
+                        <button class="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-2 w-8 h-8 rounded-lg" onclick="adjustValue(${displayIndex}, -1)">-</button>
+                    </td>
+                </tr>`;
+
+            });
+
+            html += `<tbody></table>`;
+            outputDev.innerHTML = html;
+
+        }
+        let updates = [];
+
+        function adjustValue(displayIndex, delta) {
+            const cell = document.getElementById(`val-${displayIndex}`);
+            let current = parseInt(cell.innerText) || 0;
+            const newValue = current + delta;
+            cell.innerText = newValue;
+
+            const sheetRowIndex = globalData[displayIndex].rowIndex;
+
+            const existingUpdateIndex = updates.findIndex(u => u.rowIndex === sheetRowIndex);
+            if (existingUpdateIndex !== -1) {
+                updates[existingUpdateIndex].value += delta;
+            } else {
+                updates.push({ rowIndex: sheetRowIndex, value: delta });
+            }
+        }
+
+        function filterGuilds() {
+            const input = document.getElementById('guildSearchInput').value.toLowerCase();
+            const personValue = document.getElementById("personSelect").value;
+
+            if (personValue !== "__all__") return;
+            const rows = document.querySelectorAll("#dataDisplay table tbody tr");
+            
+            rows.forEach(row => {
+                const guildCell = row.cells[1]; // Assuming the guild is in the second column
+                if (guildCell) {
+                    const guildText = guildCell.textContent.toLowerCase();
+                    row.style.display = guildText.includes(input) ? '' : 'none';
+                }
+            });
+        }
+
+        function saveChanges() {
+            const selectedPerson = document.getElementById('personSelect');
+            const dateValue = document.getElementById('dateInput').value;
+            if (!dateValue) {
+                alert('Please select a date before saving changes.');
+                return;
+            }
+            const person = selectedPerson.value;
+            if (person === '__all__') {
+                alert('Please select a specific person to save changes.');
+                return;
+            }
+
+            if (updates.length === 0) {
+                alert('ไม่มีข้อมูลเปลี่ยนแปลงที่จะบันทึก');
+                return;
+            }
+
+            // rowIndex to Sheet rowIndex mapping
+            const payload = {
+                date: dateValue,
+                person,
+                updates: updates.map(u => ({
+                    rowIndex: u.rowIndex,  // Sheet row index
+                    value: u.value
+                }))
+            };
+
+            google.script.run
+                .withSuccessHandler(() => {
+                    alert('Changes saved successfully!');
+                    updates = []; 
+                    fetchData(dateValue, person);  // Refresh data after saving changes
+                })
+                .withFailureHandler(handleError)
+                .updatePersonValues(payload);
+        }
+
+        function createnewDate() {
+            const dateValue = document.getElementById('dateInput').value;
+            console.log(dateValue)
+            if (!dateValue) {
+                alert('Please select a date before creating a new date.');
+                return;
+            };
+            
+            google.script.run
+                .withSuccessHandler(() => {
+                    alert('New date created successfully!');
+                    fetchData(); // Refresh data after creating new date
+                })
+                .withFailureHandler(handleError)
+                .createData(dateValue);
+        }
+        
+        function handleError(error) {
+            console.error('Error fetching data:', error);
+            document.getElementById('dataDisplay').innerHTML = `Error: ${error.message}`;
+        }
+    </script>
+</body>
+</html>
