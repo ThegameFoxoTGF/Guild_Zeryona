@@ -102,17 +102,18 @@ function updatePersonValues(payload) {
   updates.forEach(update => {
     const rowIndex = update.rowIndex;
 
-    // person
+    // ✅ อัปเดตค่าของ person
     const personCell = sheet.getRange(rowIndex, personColIndex);
     let currentVal = Number(personCell.getValue()) || 0;
     const newVal = currentVal + update.value;
     personCell.setValue(newVal);
 
-    // total
+    // ✅ คำนวณค่า total ใหม่
     const rowValues = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
     const peopleValues = rowValues.slice(totalColIndex); // สมมุติว่าหลัง total คือ people
     const total = peopleValues.reduce((sum, val) => sum + (Number(val) || 0), 0);
 
+    // ✅ อัปเดต total
     sheet.getRange(rowIndex, totalColIndex).setValue(total);
   });
 }
@@ -146,11 +147,11 @@ function createData(dateStringHTML) {
 
   const sheet = getOrCreateYearlySheet(year);
   sheet.getRange('A:A').setNumberFormat('@');
-  const guilds = getGuildsFromTemplate(); // from sheet Template
+  const guilds = getGuildsFromTemplate(); // จากชีท Template
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const newRows = [];
   const peopleNames = headers.slice(3)
-  // Check if the date already exists in the sheet
+  // ตรวจสอบว่ามีวันที่นี้อยู่แล้วหรือยัง
   const allValues = sheet.getDataRange().getValues();
   const existingRows = allValues.slice(1).filter(row => row[0] === dateDDMM);
 
@@ -158,7 +159,7 @@ function createData(dateStringHTML) {
     return { success: false, message: `มีข้อมูลสำหรับวันที่ ${dateDDMM} อยู่แล้ว.` };
   }
 
-  // New rows to be added
+  // เตรียมแถวใหม่
     guilds.forEach(guildName => {
       const row = [dateDDMM,guildName,0];
       for (let i = 0; i < peopleNames.length; i++) {
@@ -175,5 +176,24 @@ function createData(dateStringHTML) {
     return { success: true, message: `สร้างข้อมูลสำหรับ ${dateDDMM} แล้วจำนวน ${newRows.length} แถว.` };
   } else {
     return { success: false, message: "ไม่มีชื่อกิลด์ใน Template จึงไม่สามารถสร้างข้อมูลได้" };
+  }
+}
+
+function getDailyNote(dateValue) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Notes') || SpreadsheetApp.getActiveSpreadsheet().insertSheet('Notes');
+  const data = sheet.getDataRange().getValues();
+  const row = data.find(r => r[0] === dateValue);
+  return row ? row[1] : '';
+}
+
+
+function saveDailyNote(dateValue, note) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Notes') || SpreadsheetApp.getActiveSpreadsheet().insertSheet('Notes');
+  const data = sheet.getDataRange().getValues();
+  const rowIndex = data.findIndex(r => r[0] === dateValue);
+  if (rowIndex !== -1) {
+    sheet.getRange(rowIndex + 1, 2).setValue(note);
+  } else {
+    sheet.appendRow([dateValue, note]);
   }
 }
