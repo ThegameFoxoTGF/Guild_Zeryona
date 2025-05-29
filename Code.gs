@@ -102,18 +102,15 @@ function updatePersonValues(payload) {
   updates.forEach(update => {
     const rowIndex = update.rowIndex;
 
-    // ✅ อัปเดตค่าของ person
     const personCell = sheet.getRange(rowIndex, personColIndex);
     let currentVal = Number(personCell.getValue()) || 0;
     const newVal = currentVal + update.value;
     personCell.setValue(newVal);
 
-    // ✅ คำนวณค่า total ใหม่
     const rowValues = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
     const peopleValues = rowValues.slice(totalColIndex); // สมมุติว่าหลัง total คือ people
     const total = peopleValues.reduce((sum, val) => sum + (Number(val) || 0), 0);
 
-    // ✅ อัปเดต total
     sheet.getRange(rowIndex, totalColIndex).setValue(total);
   });
 }
@@ -151,7 +148,7 @@ function createData(dateStringHTML) {
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const newRows = [];
   const peopleNames = headers.slice(3)
-  // ตรวจสอบว่ามีวันที่นี้อยู่แล้วหรือยัง
+
   const allValues = sheet.getDataRange().getValues();
   const existingRows = allValues.slice(1).filter(row => row[0] === dateDDMM);
 
@@ -159,7 +156,7 @@ function createData(dateStringHTML) {
     return { success: false, message: `มีข้อมูลสำหรับวันที่ ${dateDDMM} อยู่แล้ว.` };
   }
 
-  // เตรียมแถวใหม่
+
     guilds.forEach(guildName => {
       const row = [dateDDMM,guildName,0];
       for (let i = 0; i < peopleNames.length; i++) {
