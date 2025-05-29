@@ -1,5 +1,5 @@
 # Guild_Zeryona
-This Black Desert Guild
+This Web App Black Desert Guild
 
 Web App By Google App Scirpt
 
