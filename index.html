@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <base target="_top">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -28,17 +29,27 @@
                 <label class="rounded-md" for="dateInput">Date:</label>
                 <input class="border-1 border-solid" for="dateInput" type="date" id="dateInput">
             </div>
+            <div class="bg-white p-2 m-2 rounded-lg shadow-md">
+              <label class="p-2" for="myGuildSizeInput">สมาชิกในกิลของฉัน:</label>
+              <input class="border rounded px-2 py-1" type="number" id="myGuildSizeInput" min="0" value="0">
+            </div>
         </div>
         <div class="flex">
             <button type="button" class="p-2 m-2 rounded-xl bg-blue-700 hover:bg-gray-500 text-white" onclick="fetchData()">ดึงข้อมูล</button>
             <button type="button" class="p-2 m-2 rounded-xl bg-green-700 hover:bg-gray-500 text-white" onclick="saveChanges()">บันทึกข้อมูล</button>
             <button type="button" class="p-2 m-2 rounded-xl bg-sky-700 hover:bg-gray-500 text-white" onclick="createnewDate()">➕ เพิ่มข้อมูลวันนี้</button>
-            
+            <button onclick="openNoteModal()" class="p-2 m-2 rounded-xl bg-yellow-600 hover:bg-yellow-500 text-white">
+            📝 บันทึกคนไม่แจ้ง
+            </button>
+
+            <div id="dailyLimitSummary" class="ml-auto"></div>
+
         </div>
 
         <div id="dataDisplay">
 
         </div>
+
     </div>
 
     <script>
@@ -62,6 +73,12 @@
 
             if (!dateValue) {
                 dateValue = document.getElementById('dateInput').value;
+            }
+
+            if (updates.length > 0) {
+                const confirmLeave = confirm("คุณยังไม่ได้บันทึกข้อมูลที่เปลี่ยนแปลง ต้องการดำเนินการต่อหรือไม่? การเปลี่ยนแปลงจะหายไป");
+                if (!confirmLeave) return;
+                updates = [];
             }
 
             console.log('Effective dateValue:', dateValue);
@@ -107,9 +124,30 @@
 
         function renderAllTable(data, headers) {
             const outputDev = document.getElementById('dataDisplay');
+            const summaryBox = document.getElementById('dailyLimitSummary');
 
             let html = '<table class="min-w-full border border-gray-300 rounded-lg shadow-md">';
             if (data && data.length > 0) {
+
+                let totalPeople = 0;
+                for (let i = 0; i < data.length; i++) {
+                    const row = data[i].row;
+                    for (let j = 3; j < row.length; j++) {
+                        const num = parseInt(row[j]);
+                        if (!isNaN(num)) {
+                            totalPeople += num;
+                        }
+                    }
+                }
+
+                const myGuildSize = document.getElementById('myGuildSizeInput').value;
+                const limit = 100;
+                const totalGuild = (totalPeople + parseInt(myGuildSize));
+                const remaining = limit - totalGuild;
+                summaryBox.innerHTML = `<div class="p-2 m-2 rounded-xl bg-yellow-100 text-center text-yellow-900 " >จำนวน: ${totalGuild} / ${limit} (เหลือ: ${remaining})</div>`;
+                
+
+
                 html += `<thead class="bg-gray-800 text-white"> <tr>`;
                 headers.forEach(header => {
                     html += `<th class="py-2 px-4 text-xl font-semibold text-center">${header}</th>`;
@@ -130,6 +168,7 @@
 
         function renderFilteredTable(data, headers, person) {
             const outputDev = document.getElementById('dataDisplay');
+            const summaryBox = document.getElementById('dailyLimitSummary');
             const personIndex = headers.indexOf(person);
             if (data.length === 0 || personIndex === -1) {
                 outputDev.innerHTML = `No data found for ${person}`;
@@ -137,6 +176,22 @@
             }
 
             let html = `<table class="min-w-full border border-gray-300 rounded-lg overflow-hidden shadow-md">`;
+                let totalPeople = 0;
+                for (let i = 0; i < data.length; i++) {
+                    const row = data[i].row;
+                    for (let j = 3; j < row.length; j++) {
+                        const num = parseInt(row[j]);
+                        if (!isNaN(num)) {
+                            totalPeople += num;
+                        }
+                    }
+                }
+
+                const myGuildSize = document.getElementById('myGuildSizeInput').value;
+                const limit = 100;
+                const totalGuild = (totalPeople + parseInt(myGuildSize));
+                const remaining = limit - totalGuild;
+                summaryBox.innerHTML = `<div class="p-2 m-2 rounded-xl bg-yellow-100 text-center text-yellow-900 " >จำนวน: ${totalGuild} / ${limit} (เหลือ: ${remaining})</div>`;
                 html += `<thead class="bg-gray-800 text-white">
                     <tr>
                     <th class="py-2 px-4 text-xl font-semibold text-center">วันที่</th>
@@ -178,6 +233,7 @@
 
             const sheetRowIndex = globalData[displayIndex].rowIndex;
 
+            // อัพเดตข้อมูลในอาร์เรย์ updates (เพิ่ม/ลดค่า delta)
             const existingUpdateIndex = updates.findIndex(u => u.rowIndex === sheetRowIndex);
             if (existingUpdateIndex !== -1) {
                 updates[existingUpdateIndex].value += delta;
@@ -220,12 +276,12 @@
                 return;
             }
 
-            // rowIndex to Sheet rowIndex mapping
+
             const payload = {
                 date: dateValue,
                 person,
                 updates: updates.map(u => ({
-                    rowIndex: u.rowIndex,  // Sheet row index
+                    rowIndex: u.rowIndex,
                     value: u.value
                 }))
             };
@@ -233,7 +289,7 @@
             google.script.run
                 .withSuccessHandler(() => {
                     alert('Changes saved successfully!');
-                    updates = []; 
+                    updates = [];
                     fetchData(dateValue, person);  // Refresh data after saving changes
                 })
                 .withFailureHandler(handleError)
@@ -247,6 +303,12 @@
                 alert('Please select a date before creating a new date.');
                 return;
             };
+
+            if (updates.length > 0) {
+                const confirmLeave = confirm("คุณยังไม่ได้บันทึกข้อมูลที่เปลี่ยนแปลง ต้องการดำเนินการต่อหรือไม่? การเปลี่ยนแปลงจะหายไป");
+                if (!confirmLeave) return;
+                updates = [];
+            }
             
             google.script.run
                 .withSuccessHandler(() => {
@@ -261,6 +323,64 @@
             console.error('Error fetching data:', error);
             document.getElementById('dataDisplay').innerHTML = `Error: ${error.message}`;
         }
+
+        function openNoteModal() {
+          const dateValue = document.getElementById('dateInput').value;
+          if (!dateValue) {
+              alert('กรุณาเลือกวันที่');
+              return;
+          }
+
+          document.getElementById('noteModal').classList.remove('hidden');
+
+          google.script.run
+              .withSuccessHandler(function(note) {
+              document.getElementById('noteInput').value = note || '';
+              })
+              .withFailureHandler(handleError)
+              .getDailyNote(dateValue);
+        }
+
+        function closeNoteModal() {
+          document.getElementById('noteModal').classList.add('hidden');
+        }
+
+        function saveNote() {
+          const note = document.getElementById('noteInput').value;
+          const dateValue = document.getElementById('dateInput').value;
+
+          if (!dateValue) {
+              alert('กรุณาเลือกวันที่');
+              return;
+          }
+
+          google.script.run
+              .withSuccessHandler(() => {
+              alert('บันทึกโน้ตเรียบร้อยแล้ว');
+              closeNoteModal();
+              })
+              .withFailureHandler(handleError)
+              .saveDailyNote(dateValue, note);
+        }
+
     </script>
+
+    <div id="noteModal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-gray-800">📝 ผู้ผิดปกติ</h2>
+            <button onclick="closeNoteModal()" class="text-gray-500 hover:text-red-500 text-xl font-bold">&times;</button>
+            </div>
+            <textarea id="noteInput" rows="6" class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-purple-400" placeholder="เขียนโน้ตของวันนี้..."></textarea>
+            <div class="mt-4 flex justify-end space-x-2">
+            <button onclick="saveNote()" class="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-semibold">
+                💾 บันทึกโน้ต
+            </button>
+            <button onclick="closeNoteModal()" class="px-4 py-2 bg-gray-400 hover:bg-gray-300 text-white rounded-lg">
+                ❌ ปิด
+            </button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
